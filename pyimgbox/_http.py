@@ -1,31 +1,32 @@
 import httpx
 
 import logging  # isort:skip
-log = logging.getLogger('pyimgbox')
+
+log = logging.getLogger("pyimgbox")
 
 
 class HTTPClient:
     def __init__(self):
-        self._client = httpx.AsyncClient(timeout=300)
+        self._client = httpx.Client(timeout=300)
         self._headers = {}
 
     @property
     def headers(self):
         return self._headers
 
-    async def __aenter__(self):
+    def __enter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
-        await self.close()
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
 
-    async def close(self):
-        await self._client.aclose()
+    def close(self):
+        self._client.close()
 
-    async def get(self, url, params={}, json=False):
-        return await self._catch_errors(
+    def get(self, url, params={}, json=False):
+        return self._catch_errors(
             request=self._client.build_request(
-                method='GET',
+                method="GET",
                 url=url,
                 headers=self._headers,
                 params=params,
@@ -33,10 +34,10 @@ class HTTPClient:
             json=json,
         )
 
-    async def post(self, url, data={}, files={}, json=False):
-        return await self._catch_errors(
+    def post(self, url, data={}, files={}, json=False):
+        return self._catch_errors(
             request=self._client.build_request(
-                method='POST',
+                method="POST",
                 url=url,
                 headers=self._headers,
                 data=data,
@@ -45,40 +46,40 @@ class HTTPClient:
             json=json,
         )
 
-    async def _catch_errors(self, request, json=False):
-        log.debug('Sending %r', request)
+    def _catch_errors(self, request, json=False):
+        log.debug("Sending %r", request)
 
         # Don't send User-Agent
-        if 'User-Agent' in request.headers:
-            del request.headers['User-Agent']
+        if "User-Agent" in request.headers:
+            del request.headers["User-Agent"]
 
         try:
-            response = await self._client.send(request)
+            response = self._client.send(request)
 
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 413:
-                    raise ConnectionError(f'{request.url}: File too large')
+                    raise ConnectionError(f"{request.url}: File too large")
                 elif response.text.strip():
-                    raise ConnectionError(f'{request.url}: {response.text}')
+                    raise ConnectionError(f"{request.url}: {response.text}")
                 else:
-                    raise ConnectionError(f'{request.url}: Unknown status error: {response.status_code}')
+                    raise ConnectionError(f"{request.url}: Unknown status error: {response.status_code}")
 
         except httpx.NetworkError:
-            raise ConnectionError(f'{request.url}: Connection failed')
+            raise ConnectionError(f"{request.url}: Connection failed")
 
         except httpx.HTTPError as e:
             if str(e).strip():
-                raise ConnectionError(f'{request.url}: {e}')
+                raise ConnectionError(f"{request.url}: {e}")
             else:
-                raise ConnectionError(f'{request.url}: Unknown error')
+                raise ConnectionError(f"{request.url}: Unknown error")
 
         else:
             if json:
                 try:
                     return response.json()
                 except ValueError as e:
-                    raise RuntimeError(f'{request.url}: Invalid JSON: {e}: {response.text}')
+                    raise RuntimeError(f"{request.url}: Invalid JSON: {e}: {response.text}")
             else:
                 return response.text

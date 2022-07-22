@@ -6,10 +6,10 @@ import bs4
 from . import _const, _http, _utils
 from ._submission import Submission
 
-log = logging.getLogger('pyimgbox')
+log = logging.getLogger("pyimgbox")
 
 
-class Gallery():
+class Gallery:
     """
     Upload images to a gallery on imgbox.com
 
@@ -21,8 +21,7 @@ class Gallery():
     comments_enabled: Whether comments are enabled for this gallery
     """
 
-    def __init__(self, title=None, thumb_width=100, square_thumbs=False,
-                 adult=False, comments_enabled=False):
+    def __init__(self, title=None, thumb_width=100, square_thumbs=False, adult=False, comments_enabled=False):
         self._client = _http.HTTPClient()
         self._gallery_token = {}
         self.title = title
@@ -31,15 +30,15 @@ class Gallery():
         self.adult = adult
         self.comments_enabled = comments_enabled
 
-    async def __aenter__(self):
+    def __enter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
-        await self.close()
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
 
-    async def close(self):
+    def close(self):
         """Stop adding images to this gallery"""
-        await self._client.close()
+        self._client.close()
 
     @property
     def title(self):
@@ -53,19 +52,19 @@ class Gallery():
     @title.setter
     def title(self, value):
         if self.created:
-            raise RuntimeError('Gallery was already created')
+            raise RuntimeError("Gallery was already created")
         else:
             self._title = str(value) if value is not None else None
 
     @property
     def thumb_width(self):
         """Width of thumbnails for this gallery"""
-        return getattr(self, '_thumb_width', 100)
+        return getattr(self, "_thumb_width", 100)
 
     @thumb_width.setter
     def thumb_width(self, value):
         if not isinstance(value, (int, float)):
-            raise ValueError(f'Not a number: {value!r}')
+            raise ValueError(f"Not a number: {value!r}")
         self._thumb_width = _utils.find_closest_number(int(value), self._thumb_widths)
         self._thumbnail_size = self._thumb_widths[self._thumb_width]
 
@@ -87,12 +86,11 @@ class Gallery():
     @property
     def adult(self):
         """Whether images are for adults only"""
-        return self._content_type != _const.CONTENT_TYPES['family']
+        return self._content_type != _const.CONTENT_TYPES["family"]
 
     @adult.setter
     def adult(self, value):
-        self._content_type = (_const.CONTENT_TYPES['adult'] if value
-                              else _const.CONTENT_TYPES['family'])
+        self._content_type = _const.CONTENT_TYPES["adult"] if value else _const.CONTENT_TYPES["family"]
 
     @property
     def comments_enabled(self):
@@ -106,7 +104,7 @@ class Gallery():
     @comments_enabled.setter
     def comments_enabled(self, value):
         if self.created:
-            raise RuntimeError('Gallery was already created')
+            raise RuntimeError("Gallery was already created")
         else:
             self._comments_enabled = bool(value)
 
@@ -130,11 +128,10 @@ class Gallery():
     def created(self):
         """Whether this gallery was created remotely"""
         return bool(
-            self._gallery_token and
-            _const.CSRF_TOKEN_HEADER in self._client.headers,
+            self._gallery_token and _const.CSRF_TOKEN_HEADER in self._client.headers,
         )
 
-    async def create(self):
+    def create(self):
         """
         Create gallery remotely
 
@@ -147,18 +144,18 @@ class Gallery():
         responds in an unexpected way.
         """
         if self.created:
-            raise RuntimeError('Gallery was already created')
+            raise RuntimeError("Gallery was already created")
 
         # Get CSRF token from entry page
         self._client.headers.pop(_const.CSRF_TOKEN_HEADER, None)
-        text = await self._client.get(f'https://{_const.SERVICE_DOMAIN}/')
+        text = self._client.get(f"https://{_const.SERVICE_DOMAIN}/")
 
         # Find <meta content="..." name="csrf-token" />
         soup = bs4.BeautifulSoup(text, features="html.parser")
-        csrf_token = ''
-        for meta in soup.find_all('meta', {'name': 'csrf-token'}):
-            csrf_token = meta.get('content')
-            log.debug('Found CSRF token: %s', csrf_token)
+        csrf_token = ""
+        for meta in soup.find_all("meta", {"name": "csrf-token"}):
+            csrf_token = meta.get("content")
+            log.debug("Found CSRF token: %s", csrf_token)
         if not csrf_token:
             raise RuntimeError("Couldn't find CSRF token in HTML head")
         else:
@@ -166,21 +163,21 @@ class Gallery():
 
         # Get token_id / token_secret + gallery_id / gallery_secret
         data = {
-            'gallery': 'true',
-            'gallery_title': self.title or '',
-            'comments_enabled': '1' if self.comments_enabled else '0',
+            "gallery": "true",
+            "gallery_title": self.title or "",
+            "comments_enabled": "1" if self.comments_enabled else "0",
         }
 
-        gallery_token = await self._client.post(
+        gallery_token = self._client.post(
             url=_const.TOKEN_URL,
             data=data,
             json=True,
         )
         if not isinstance(gallery_token, dict):
-            raise RuntimeError(f'Not a dict: {gallery_token!r}')
+            raise RuntimeError(f"Not a dict: {gallery_token!r}")
         else:
             self._gallery_token = gallery_token
-            log.debug('Gallery token: %s', self._gallery_token)
+            log.debug("Gallery token: %s", self._gallery_token)
 
     def _prepare(self, *filepaths):
         """
@@ -193,17 +190,13 @@ class Gallery():
         for filepath in filepaths:
             # Open file or get error message
             try:
-                fileobj = open(filepath, 'rb')
+                fileobj = open(filepath, "rb")
             except OSError as e:
                 files.append((filepath, None, e.strerror))
             else:
                 # Check file size limit
                 if os.path.getsize(filepath) > _const.MAX_FILE_SIZE:
-                    files.append((
-                        filepath,
-                        None,
-                        f'File is larger than {_const.MAX_FILE_SIZE} bytes'
-                    ))
+                    files.append((filepath, None, f"File is larger than {_const.MAX_FILE_SIZE} bytes"))
 
                 # Store the tuple we need for the POST request
                 else:
@@ -212,7 +205,7 @@ class Gallery():
 
         return files
 
-    async def _upload_image(self, filepath, filetuple, error):
+    def _upload_image(self, filepath, filetuple, error):
         """
         Upload image file
 
@@ -230,25 +223,25 @@ class Gallery():
         # Auto-create gallery
         if not self.created:
             try:
-                await self.create()
+                self.create()
             except ConnectionError as e:
                 return Submission(filepath=filepath, error=str(e))
 
         # Build request
         data = {
-            'token_id': str(self._gallery_token['token_id']),
-            'token_secret': str(self._gallery_token['token_secret']),
-            'gallery_id': str(self._gallery_token.get('gallery_id', 'null')),
-            'gallery_secret': str(self._gallery_token.get('gallery_secret', 'null')),
-            'content_type': str(self._content_type),
-            'thumbnail_size': str(self._thumbnail_size),
-            'comments_enabled': '1' if self.comments_enabled else '0',
+            "token_id": str(self._gallery_token["token_id"]),
+            "token_secret": str(self._gallery_token["token_secret"]),
+            "gallery_id": str(self._gallery_token.get("gallery_id", "null")),
+            "gallery_secret": str(self._gallery_token.get("gallery_secret", "null")),
+            "content_type": str(self._content_type),
+            "thumbnail_size": str(self._thumbnail_size),
+            "comments_enabled": "1" if self.comments_enabled else "0",
         }
-        files = {'files[]': filetuple}
+        files = {"files[]": filetuple}
 
         # Upload image
         try:
-            response = await self._client.post(
+            response = self._client.post(
                 url=_const.PROCESS_URL,
                 data=data,
                 files=files,
@@ -257,15 +250,15 @@ class Gallery():
         except ConnectionError as e:
             return Submission(filepath=filepath, error=str(e))
         else:
-            log.debug('POST response: %s', response)
+            log.debug("POST response: %s", response)
             try:
-                info = response['files'][0]
-                image_url = info['original_url']
-                thumbnail_url = info['thumbnail_url']
-                web_url = info['url']
+                info = response["files"][0]
+                image_url = info["original_url"]
+                thumbnail_url = info["thumbnail_url"]
+                web_url = info["url"]
             except (KeyError, IndexError, TypeError) as e:
-                log.debug('Unexpected response: %r', response)
-                raise RuntimeError(f'Unexpected response: {response!r}') from e
+                log.debug("Unexpected response: %r", response)
+                raise RuntimeError(f"Unexpected response: {response!r}") from e
             return Submission(
                 filepath=filepath,
                 image_url=image_url,
@@ -275,7 +268,7 @@ class Gallery():
                 edit_url=self.edit_url,
             )
 
-    async def upload(self, filepath):
+    def upload(self, filepath):
         """
         Upload image to this gallery
 
@@ -284,9 +277,9 @@ class Gallery():
         Return Submission object.
         """
         filepath, filetuple, error = self._prepare(filepath)[0]
-        return await self._upload_image(filepath, filetuple, error)
+        return self._upload_image(filepath, filetuple, error)
 
-    async def add(self, filepaths):
+    def add(self, filepaths):
         """
         Upload images to this gallery
 
@@ -300,14 +293,14 @@ class Gallery():
         Yield Submission objects asynchronously.
         """
         for filepath, filetuple, error in self._prepare(*filepaths):
-            yield await self._upload_image(filepath, filetuple, error)
+            yield self._upload_image(filepath, filetuple, error)
 
     def __repr__(self):
         return (
-            f'{type(self).__name__}('
-            f'title={repr(self.title)}, '
-            f'thumb_width={repr(self.thumb_width)}, '
-            f'square_thumbs={repr(self.square_thumbs)}, '
-            f'adult={repr(self.adult)}, '
-            f'comments_enabled={repr(self.comments_enabled)})'
+            f"{type(self).__name__}("
+            f"title={repr(self.title)}, "
+            f"thumb_width={repr(self.thumb_width)}, "
+            f"square_thumbs={repr(self.square_thumbs)}, "
+            f"adult={repr(self.adult)}, "
+            f"comments_enabled={repr(self.comments_enabled)})"
         )
